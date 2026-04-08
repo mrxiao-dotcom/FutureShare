@@ -1,0 +1,254 @@
+// 结构化期货基金管理系统数据模型
+//
+// 核心概念：
+// - 出资结构：劣后出资 + 优先出资 = 总出资（总资产）
+// - 份额：投资金额（1元=1份）
+// - 比例：个人出资 / 同类总出资（自动计算）
+// - 可分配利润 = 总权益 - 总出资
+// - 利润分配：按投顾/劣后/优先比例分配
+// - 劣后内部按各自出资比例分配
+// - 亏损分配：优先保本，劣后承担所有亏损
+// - 高水位线机制
+//
+// 注意：SQLite 不支持 Prisma 原生枚举，因此使用 String 类型
+// 在应用层通过常量定义枚举值
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 类型常量定义（应用层使用）
+// ============================================
+//
+// 用户类型：PRIORITY(优先) / JUNIOR(劣后) / TRADER(操盘手)
+// 用户状态：ACTIVE / SUSPENDED / WITHDRAWN
+// 参与状态：ACTIVE / SETTLED / WITHDRAWN
+// 交易类型：DEPOSIT / WITHDRAWAL / DIVIDEND / LOSS_SHARE / MANAGEMENT_FEE / REINVEST / ADJUSTMENT
+// 交易状态：PENDING / PROCESSING / COMPLETED / CANCELLED / FAILED
+// 结算状态：PENDING / CALCULATING / COMPLETED / CANCELLED
+
+// ============================================
+// Fund 模型：基金全局配置与状态
+// ============================================
+model Fund {
+  id                  String   @id @default(cuid())
+  name                String   // 基金名称
+  totalAssets         Float    @default(0) // 总资产（动态权益）
+
+  // 优先/劣后本金配置（百分比）
+  priorityCapitalRate Float    @default(0.9)  // 优先本金比例，默认 90%
+  juniorCapitalRate   Float    @default(0.1)  // 劣后本金比例，默认 10%
+
+  // 各方分成比例（盈利时）
+  traderShareRatio    Float    @default(0.2)  // 操盘手分成，默认 20%
+  priorityShareRatio  Float    @default(0.4)  // 优先方分成，默认 40%
+  juniorShareRatio    Float    @default(0.4)  // 劣后方分成，默认 40%
+
+  // 基准本金（高水位线）
+  baseCapital         Float    @default(0)    // 结算后的基准本金，用于下次分红计算
+
+  // 当前周期本金明细
+  currentPriorityCapital Float @default(0)    // 当前优先本金
+  currentJuniorCapital   Float @default(0)    // 当前劣后本金
+
+  // 时间戳
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // 关联关系
+  transactions        Transaction[]
+  dailySnapshots      DailySnapshot[]
+  fundParticipants    FundParticipant[]
+  settlements         Settlement[]
+
+  @@map("funds")
+}
+
+// ============================================
+// User 模型：用户基本信息及份额
+// ============================================
+model User {
+  id              String   @id @default(cuid())
+  name            String   @unique  // 用户名（唯一，用于登录）
+  email           String?  // 邮箱
+  displayName     String?  // 显示名称
+  phone           String?  // 手机号
+
+  // 登录认证
+  password        String?  // 密码（加密存储）
+  isAdmin         Boolean  @default(false)  // 是否管理员
+
+  userType        String   // 用户类型：PRIORITY / JUNIOR / TRADER
+  shareRatio      Float    @default(0)  // 劣后用户在本周期的份额比例
+
+  // 累计收益（用于历史统计）
+  totalProfit     Float    @default(0)  // 累计盈利分红
+  totalLoss       Float    @default(0)  // 累计亏损
+
+  // 账户状态：ACTIVE / SUSPENDED / WITHDRAWN
+  status          String   @default("ACTIVE")
+
+  createdAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // 关联关系
+  transactions    Transaction[]
+  participations  FundParticipant[]
+
+  @@map("users")
+}
+
+// ============================================
+// FundParticipant 模型：用户参与基金记录
+// ============================================
+model FundParticipant {
+  id              String   @id @default(cuid())
+
+  // 关联
+  fundId          String
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 入资信息
+  capitalAmount   Float    // 入资本金（投资金额，1元=1份）
+  shareRatio      Float    @default(0)  // 份额比例 = 个人出资 / 同类总出资（自动计算）
+
+  // 参与周期（用于高水位线追踪）
+  cycleNumber     Int      @default(1)  // 第几个周期参与
+
+  // 状态：ACTIVE / SETTLED / WITHDRAWN
+  status          String   @default("ACTIVE")
+
+  createdAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([fundId, userId])
+  @@map("fund_participants")
+}
+
+// ============================================
+// Transaction 模型：资金流水记录
+// ============================================
+model Transaction {
+  id              String   @id @default(cuid())
+
+  // 关联
+  fundId          String
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // 流水类型：DEPOSIT / WITHDRAWAL / DIVIDEND / LOSS_SHARE / MANAGEMENT_FEE / REINVEST / ADJUSTMENT
+  type            String
+
+  // 金额
+  amount          Float    // 变动金额（正数=入金，负数=出金）
+
+  // 状态：PENDING / PROCESSING / COMPLETED / CANCELLED / FAILED
+  status          String   @default("PENDING")
+
+  // 生效周期
+  effectiveCycle  Int?     // 计划生效的周期号（null表示立即生效）
+
+  // 描述
+  description     String?
+
+  // 结算时计算的结果（事后记录）
+  settledAmount   Float?   // 结算确认金额
+
+  createdAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([fundId, status])
+  @@index([fundId, type])
+  @@map("transactions")
+}
+
+// ============================================
+// DailySnapshot 模型：每日权益快照
+// ============================================
+// 
+// 快照计算规则：
+// - 可分配利润 = 总权益 - 总出资（优先 + 劣后）
+// - 盈利时：各方按配置比例分配利润
+// - 亏损时：劣后承担所有亏损，优先保本
+// - 操盘手只在盈利时分配
+// ============================================
+model DailySnapshot {
+  id              String   @id @default(cuid())
+
+  // 关联
+  fundId          String
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  // 快照日期
+  snapshotDate    DateTime @default(now())
+
+  // 权益数据
+  totalAssets     Float    // 当日总资产（总权益）
+  priorityAssets Float    // 优先方当前权益
+  juniorAssets   Float    // 劣后池当前权益
+  traderAssets   Float    // 操盘手当前权益
+
+  // 各方理论分配（利润部分）
+  priorityShare  Float    // 优先方分配利润
+  juniorShare    Float    // 劣后池分配利润
+  traderShare    Float    // 操盘手分配利润
+
+  // 盈亏情况
+  dailyProfit    Float    @default(0)  // 当日可分配利润
+  cumulativeProfit Float  @default(0)  // 累计可分配利润
+
+  createdAt      DateTime @default(now())
+
+  @@unique([fundId, snapshotDate])
+  @@index([fundId])
+  @@map("daily_snapshots")
+}
+
+// ============================================
+// Settlement 模型：结算周期记录
+// ============================================
+model Settlement {
+  id              String   @id @default(cuid())
+
+  // 关联
+  fundId          String
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  // 周期信息
+  cycleNumber     Int      // 周期编号
+  startDate       DateTime // 周期开始日期
+  endDate         DateTime // 周期结束日期
+
+  // 结算数据
+  startAssets     Float    // 期初总资产
+  endAssets       Float    // 期末总资产
+  profit          Float    // 本周期利润
+
+  // 各方分配结果
+  priorityAmount  Float    // 优先方分配
+  juniorAmount    Float    // 劣后方总分配
+  traderAmount    Float    // 操盘手分配
+
+  // 新基准本金
+  newBaseCapital  Float    // 结算后新的基准本金（高水位线）
+
+  // 状态：PENDING / CALCULATING / COMPLETED / CANCELLED
+  status          String   @default("PENDING")
+
+  createdAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([fundId, cycleNumber])
+  @@map("settlements")
+}
