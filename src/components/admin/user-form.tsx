@@ -1,14 +1,11 @@
 'use client';
 
 /**
- * 用户录入表单组件
+ * 投资者录入表单组件
  *
  * 业务规则：
- * - 份额 = 投资金额（1元=1份）
- * - 比例 = 个人出资 / 同类总出资（自动计算）
- * - 可分配利润 = 总权益 - 总出资
- * - 利润分配：投顾/劣后/优先 按设定比例分配
- * - 劣后内部按各自出资比例分配
+ * - 只录入劣后投资者
+ * - 优先资金按1:9比例自动配齐
  */
 
 import { useState, useMemo } from 'react';
@@ -18,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, Percent, Info } from 'lucide-react';
+import { Loader2, UserPlus, Info, TrendingUp } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 
 interface ExistingUser {
@@ -40,92 +37,59 @@ export function UserForm({
   totalJuniorCapital,
   totalPriorityCapital,
   existingJuniorUsers,
-  existingPriorityUsers,
 }: UserFormProps) {
   const router = useRouter();
   const { toast } = useToast();
 
   // 表单状态
-  const [name, setName] = useState('');          // 显示名称
-  const [username, setUsername] = useState('');   // 登录用户名
-  const [password, setPassword] = useState('');   // 登录密码
-  const [userType, setUserType] = useState<'JUNIOR' | 'PRIORITY'>('JUNIOR');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [capitalAmount, setCapitalAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSupplingPriority, setIsSupplingPriority] = useState(false);
 
-  // 根据用户类型获取对应的现有用户和总额
-  const currentUsers = userType === 'JUNIOR' ? existingJuniorUsers : existingPriorityUsers;
-  const totalCapital = userType === 'JUNIOR' ? totalJuniorCapital : totalPriorityCapital;
+  // 计算优先资金差额
+  const targetPriorityCapital = totalJuniorCapital * 9;
+  const priorityGap = targetPriorityCapital - totalPriorityCapital;
+  const needsSuppling = priorityGap > 0 && totalJuniorCapital > 0;
 
   // 计算当前用户输入后的比例（自动计算）
-  const calculatedRatio = useMemo(() => {
-    const amount = parseFloat(capitalAmount) || 0;
-    if (amount <= 0 || totalCapital <= 0) return 0;
-    return amount / totalCapital;
-  }, [capitalAmount, totalCapital]);
-
-  // 计算加入后的总出资和各方比例
   const afterJoin = useMemo(() => {
     const amount = parseFloat(capitalAmount) || 0;
-    const newTotal = totalCapital + amount;
-    const newUserRatio = newTotal > 0 ? amount / newTotal : 0;
+    const newJuniorTotal = totalJuniorCapital + amount;
+    const newPriorityTarget = newJuniorTotal * 9;
     return {
-      newTotal,
-      newUserRatio,
-      otherTotalRatio: newTotal > 0 ? totalCapital / newTotal : 0,
+      newJuniorTotal,
+      newPriorityTarget,
+      priorityGap: newPriorityTarget - totalPriorityCapital,
     };
-  }, [capitalAmount, totalCapital]);
+  }, [capitalAmount, totalJuniorCapital, totalPriorityCapital]);
 
   /**
-   * 表单提交处理
+   * 提交劣后投资者
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 基础校验
     if (!name.trim()) {
-      toast({
-        variant: 'destructive',
-        title: '姓名不能为空',
-        description: '请输入投资者姓名',
-      });
+      toast({ variant: 'destructive', title: '姓名不能为空' });
       return;
     }
 
     if (!username.trim()) {
-      toast({
-        variant: 'destructive',
-        title: '用户名不能为空',
-        description: '请输入登录用户名',
-      });
+      toast({ variant: 'destructive', title: '用户名不能为空' });
       return;
     }
 
-    if (!password.trim()) {
-      toast({
-        variant: 'destructive',
-        title: '密码不能为空',
-        description: '请设置登录密码',
-      });
-      return;
-    }
-
-    if (password.length < 6) {
-      toast({
-        variant: 'destructive',
-        title: '密码太短',
-        description: '密码至少需要6个字符',
-      });
+    if (!password.trim() || password.length < 6) {
+      toast({ variant: 'destructive', title: '密码至少需要6个字符' });
       return;
     }
 
     const capitalNum = parseFloat(capitalAmount);
     if (isNaN(capitalNum) || capitalNum <= 0) {
-      toast({
-        variant: 'destructive',
-        title: '金额无效',
-        description: '投资金额必须大于0',
-      });
+      toast({ variant: 'destructive', title: '金额无效' });
       return;
     }
 
@@ -139,8 +103,8 @@ export function UserForm({
           fundId,
           name: name.trim(),
           username: username.trim(),
-          password: password,
-          userType,
+          password,
+          userType: 'JUNIOR',
           capitalAmount: capitalNum,
         }),
       });
@@ -148,34 +112,50 @@ export function UserForm({
       const result = await response.json();
 
       if (result.success) {
-        toast({
-          title: '添加成功',
-          description: `已成功添加${userType === 'JUNIOR' ? '劣后' : '优先'}投资者：${name}`,
-        });
-
-        // 重置表单
+        toast({ title: '添加成功', description: `已添加劣后投资者：${name}` });
         setName('');
         setUsername('');
         setPassword('');
         setCapitalAmount('');
-
-        // 刷新页面数据
         router.refresh();
       } else {
-        toast({
-          variant: 'destructive',
-          title: '添加失败',
-          description: result.error || '未知错误',
-        });
+        toast({ variant: 'destructive', title: '添加失败', description: result.error });
       }
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: '操作失败',
-        description: error instanceof Error ? error.message : '网络请求失败',
-      });
+      toast({ variant: 'destructive', title: '操作失败', description: '网络请求失败' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * 补齐优先资金
+   */
+  const handleSupplyPriority = async () => {
+    setIsSupplingPriority(true);
+
+    try {
+      const response = await fetch('/api/admin/fund/supply-priority', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fundId }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: '补齐成功',
+          description: `已补齐优先资金：${formatCurrency(result.data.suppliedAmount)}`,
+        });
+        router.refresh();
+      } else {
+        toast({ variant: 'destructive', title: '补齐失败', description: result.error });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: '操作失败', description: '网络请求失败' });
+    } finally {
+      setIsSupplingPriority(false);
     }
   };
 
@@ -184,38 +164,15 @@ export function UserForm({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" />
-          添加投资者
+          添加劣后投资者
         </CardTitle>
         <CardDescription>
-          录入新投资者信息，份额比例将自动计算
+          劣后出资后，系统自动按1:9配齐优先资金
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 用户类型 */}
-          <div className="space-y-2">
-            <Label>投资者类型</Label>
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant={userType === 'JUNIOR' ? 'default' : 'outline'}
-                onClick={() => setUserType('JUNIOR')}
-                className="flex-1"
-              >
-                劣后投资者（{formatCurrency(totalJuniorCapital)}）
-              </Button>
-              <Button
-                type="button"
-                variant={userType === 'PRIORITY' ? 'default' : 'outline'}
-                onClick={() => setUserType('PRIORITY')}
-                className="flex-1"
-              >
-                优先投资者（{formatCurrency(totalPriorityCapital)}）
-              </Button>
-            </div>
-          </div>
-
-          {/* 显示名称 */}
+          {/* 姓名 */}
           <div className="space-y-2">
             <Label htmlFor="name">姓名 *</Label>
             <Input
@@ -227,7 +184,7 @@ export function UserForm({
             />
           </div>
 
-          {/* 登录用户名 */}
+          {/* 用户名 */}
           <div className="space-y-2">
             <Label htmlFor="username">登录用户名 *</Label>
             <Input
@@ -239,7 +196,7 @@ export function UserForm({
             />
           </div>
 
-          {/* 登录密码 */}
+          {/* 密码 */}
           <div className="space-y-2">
             <Label htmlFor="password">登录密码 *</Label>
             <Input
@@ -253,13 +210,11 @@ export function UserForm({
             />
           </div>
 
-          {/* 投资金额（份额） */}
+          {/* 出资金额 */}
           <div className="space-y-2">
             <Label htmlFor="capitalAmount">
-              出资金额（份额） *
-              <span className="text-muted-foreground font-normal ml-1">
-                1元=1份
-              </span>
+              出资金额 *
+              <span className="text-muted-foreground font-normal ml-1">1元=1份</span>
             </Label>
             <Input
               id="capitalAmount"
@@ -278,41 +233,38 @@ export function UserForm({
             <div className="p-4 bg-muted rounded-lg space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Info className="h-4 w-4" />
-                比例预览（自动计算）
+                比例预览
               </div>
-
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>当前{userType === 'JUNIOR' ? '劣后' : '优先'}方总出资：</span>
-                  <span className="font-medium">{formatCurrency(totalCapital)}</span>
+                  <span>当前劣后总出资：</span>
+                  <span className="font-medium">{formatCurrency(totalJuniorCapital)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>新增出资金额：</span>
                   <span className="font-medium text-primary">{formatCurrency(parseFloat(capitalAmount))}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>新增后总出资：</span>
-                  <span className="font-medium">{formatCurrency(afterJoin.newTotal)}</span>
+                  <span>新增后劣后总额：</span>
+                  <span className="font-medium">{formatCurrency(afterJoin.newJuniorTotal)}</span>
                 </div>
-                <div className="border-t pt-2 mt-2 flex justify-between">
-                  <span>新用户占比：</span>
-                  <span className="font-bold text-primary">
-                    {formatPercent(afterJoin.newUserRatio)} / {formatPercent(afterJoin.otherTotalRatio)}（剩余）
-                  </span>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span>需配齐优先资金：</span>
+                  <span className="font-medium text-blue-600">{formatCurrency(afterJoin.newPriorityTarget)}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 提示信息 */}
-          {currentUsers.length > 0 && (
+          {/* 现有用户提示 */}
+          {existingJuniorUsers.length > 0 && (
             <div className="p-3 bg-muted rounded-lg text-sm">
               <div className="flex justify-between mb-1">
-                <span>现有{userType === 'JUNIOR' ? '劣后' : '优先'}用户：</span>
-                <span className="font-medium">{currentUsers.length} 人</span>
+                <span>现有劣后用户：</span>
+                <span className="font-medium">{existingJuniorUsers.length} 人</span>
               </div>
               <div className="text-muted-foreground text-xs">
-                {currentUsers.map(u => `${u.name}: ${formatCurrency(u.capitalAmount)}`).join(' | ')}
+                {existingJuniorUsers.map(u => `${u.name}: ${formatCurrency(u.capitalAmount)}`).join(' | ')}
               </div>
             </div>
           )}
@@ -332,6 +284,28 @@ export function UserForm({
             )}
           </Button>
         </form>
+
+        {/* 补齐优先资金按钮 */}
+        {needsSuppling && (
+          <div className="pt-4 border-t">
+            <Button
+              variant="outline"
+              className="w-full border-blue-200 bg-blue-50 hover:bg-blue-100"
+              onClick={handleSupplyPriority}
+              disabled={isSupplingPriority}
+            >
+              {isSupplingPriority ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <TrendingUp className="mr-2 h-4 w-4" />
+              )}
+              补齐优先 {formatCurrency(priorityGap)}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              劣后 × 9 - 优先实出 = 需补齐金额
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
