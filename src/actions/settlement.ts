@@ -12,7 +12,7 @@
  * 5. 更新高水位线（基准本金）
  */
 
-import { PrismaClient, SettlementStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 // ============================================
@@ -158,7 +158,7 @@ export async function adminTriggerSettlement(
         juniorAmount,
         traderAmount,
         newBaseCapital: input.currentAssets,
-        status: SettlementStatus.COMPLETED,
+        status: 'COMPLETED',
       },
     });
 

@@ -7,7 +7,8 @@
  * 注意：由于是管理员直接操作，状态直接设置为 COMPLETED（立即生效）
  */
 
-import { PrismaClient, TransactionType, TransactionStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { TransactionType, TransactionStatus } from '@/lib/constants';
 import { z } from 'zod';
 
 // ============================================
@@ -182,9 +183,9 @@ export async function adminRecordTransaction(
         id: transaction.id,
         fundId: transaction.fundId,
         userId: transaction.userId,
-        type: transaction.type,
+        type: transaction.type as TransactionType,
         amount: transaction.amount,
-        status: transaction.status,
+        status: transaction.status as TransactionStatus,
         description: transaction.description,
         createdAt: transaction.createdAt,
       },

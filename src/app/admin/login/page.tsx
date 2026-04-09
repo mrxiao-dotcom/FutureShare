@@ -1,10 +1,6 @@
 'use client';
 
-/**
- * 管理员登录页面
- */
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -14,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LogIn, Shield } from 'lucide-react';
 
-export default function AdminLoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -22,11 +18,9 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [showExpiredMessage, setShowExpiredMessage] = useState(false);
 
-  // 表单状态
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // 检查 URL 参数
   useEffect(() => {
     if (searchParams.get('expired') === 'true') {
       setShowExpiredMessage(true);
@@ -70,10 +64,7 @@ export default function AdminLoginPage() {
           description: `欢迎管理员 ${result.user.name}！`,
         });
 
-        // 获取重定向路径
         const redirectTo = searchParams.get('redirect') || '/admin';
-
-        // 跳转到管理后台
         router.push(redirectTo);
       } else {
         toast({
@@ -94,9 +85,93 @@ export default function AdminLoginPage() {
   };
 
   return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          管理员登录
+        </CardTitle>
+        <CardDescription className="text-center">
+          请输入管理员账号和密码
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="username">管理员账号 *</Label>
+            <Input
+              id="username"
+              type="text"
+              placeholder="请输入管理员账号"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">密码 *</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="请输入密码"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                登录中...
+              </>
+            ) : (
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                登录
+              </>
+            )}
+          </Button>
+        </form>
+      </CardContent>
+
+      <CardFooter className="flex justify-center">
+        <div className="text-xs text-center text-muted-foreground">
+          <Link href="/login" className="hover:text-foreground">
+            返回用户登录
+          </Link>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function LoginFormFallback() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          管理员登录
+        </CardTitle>
+        <CardDescription className="text-center">
+          加载中...
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
             <h1 className="text-3xl font-bold">
@@ -107,67 +182,9 @@ export default function AdminLoginPage() {
           <p className="text-muted-foreground mt-2">结构化基金管理系统</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              管理员登录
-            </CardTitle>
-            <CardDescription className="text-center">
-              请输入管理员账号和密码
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">管理员账号 *</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="请输入管理员账号"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">密码 *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="请输入密码"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    登录中...
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    登录
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-
-          <CardFooter className="flex justify-center">
-            <div className="text-xs text-center text-muted-foreground">
-              <Link href="/login" className="hover:text-foreground">
-                返回用户登录
-              </Link>
-            </div>
-          </CardFooter>
-        </Card>
+        <Suspense fallback={<LoginFormFallback />}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );

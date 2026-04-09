@@ -23,7 +23,7 @@ interface Fund {
 
 interface Settlement {
   cycleNumber: number;
-  endDate: Date | null;
+  endDate: Date;
   profit: number;
   status: string;
 }
@@ -31,7 +31,7 @@ interface Settlement {
 interface JuniorUser {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   shareRatio: number;
   status: string;
   totalProfit: number;
@@ -206,7 +206,7 @@ export function AdminDashboard({ funds, fund, juniorUsers }: AdminDashboardProps
                 lastSettlement
                   ? {
                       cycleNumber: lastSettlement.cycleNumber,
-                      endDate: lastSettlement.endDate,
+                      endDate: lastSettlement.endDate ?? new Date(),
                       profit: lastSettlement.profit,
                       status: lastSettlement.status,
                     }

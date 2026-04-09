@@ -308,7 +308,7 @@ export function JuniorUserDashboard({
                     className="text-muted-foreground"
                   />
                   <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(value as number)}
                     labelFormatter={(label) => `日期：${label}`}
                   />
                   <Area

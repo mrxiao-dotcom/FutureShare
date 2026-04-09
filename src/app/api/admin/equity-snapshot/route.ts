@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const fund = await prisma.fund.findUnique({
       where: { id: fundId },
       include: {
-        participants: {
+        fundParticipants: {
           where: { status: 'ACTIVE' },
           include: { user: true },
         },
