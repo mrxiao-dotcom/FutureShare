@@ -90,9 +90,12 @@ export async function POST(request: NextRequest) {
     });
 
     // 设置 httpOnly cookie（7天有效期）
+    // 根据实际请求协议决定 secure 模式
+    const isSecure = request.headers.get('x-forwarded-proto') === 'https' || 
+                     request.headers.get('sec-fetch-site') === 'same-origin';
     response.cookies.set('admin_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7天
       path: '/',
