@@ -50,11 +50,16 @@ export async function POST(request: NextRequest) {
       // 先更新基金资金（如果需要）
       if (participation) {
         if (user.userType === 'JUNIOR') {
+          // 删除劣后时，需要同时扣减对应的优先资金（劣后×9）
+          const priorityDeduction = participation.capitalAmount * 9;
           await prisma.fund.update({
             where: { id: participation.fundId },
             data: {
               currentJuniorCapital: {
                 decrement: participation.capitalAmount,
+              },
+              currentPriorityCapital: {
+                decrement: priorityDeduction,
               },
             },
           });
@@ -120,11 +125,16 @@ export async function POST(request: NextRequest) {
 
       // 更新基金资金
       if (user.userType === 'JUNIOR') {
+        // 退出劣后时，需要同时扣减对应的优先资金（劣后×9）
+        const priorityDeduction = participation.capitalAmount * 9;
         await prisma.fund.update({
           where: { id: participation.fundId },
           data: {
             currentJuniorCapital: {
               decrement: participation.capitalAmount,
+            },
+            currentPriorityCapital: {
+              decrement: priorityDeduction,
             },
           },
         });

@@ -229,9 +229,11 @@ export function UserList({
             刷新
           </button>
         </div>
+      </CardHeader>
 
+      <CardContent className="space-y-4">
         {/* 标签切换 */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2">
           <Button
             variant={activeTab === 'junior' ? 'default' : 'outline'}
             size="sm"
@@ -247,9 +249,29 @@ export function UserList({
             优先用户 ({priorityUsers.length})
           </Button>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
+        {/* 资金概览 */}
+        <div className="grid grid-cols-4 gap-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm">
+          <div className="text-center">
+            <div className="text-muted-foreground">劣后出资</div>
+            <div className="font-semibold text-orange-600">{formatCurrency(totalJuniorCapital)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-muted-foreground">优先实出</div>
+            <div className="font-semibold text-blue-600">{formatCurrency(totalPriorityCapital)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-muted-foreground">优先应出</div>
+            <div className="font-semibold text-green-600">{formatCurrency(totalJuniorCapital * 9)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-muted-foreground">差额</div>
+            <div className={`font-semibold ${totalPriorityCapital < totalJuniorCapital * 9 ? 'text-amber-600' : 'text-green-600'}`}>
+              {formatCurrency(totalJuniorCapital * 9 - totalPriorityCapital)}
+            </div>
+          </div>
+        </div>
+
         {currentUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Users className="h-10 w-10 text-muted-foreground mb-3" />
