@@ -221,13 +221,14 @@ export function UserList({
               </span>
             </CardDescription>
           </div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.refresh()}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground h-9 px-3"
           >
             <RefreshCw className="h-4 w-4 mr-1" />
             刷新
-          </button>
+          </Button>
         </div>
       </CardHeader>
 

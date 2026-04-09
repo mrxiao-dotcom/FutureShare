@@ -4,13 +4,13 @@
  * 投资者管理客户端组件
  */
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UserForm } from '@/components/admin/user-form';
 import { UserList } from '@/components/admin/user-list';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft, Users, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Fund {
@@ -37,7 +37,24 @@ interface UsersDashboardProps {
   priorityUsers: User[];
 }
 
-export function UsersDashboard({ funds, fund, juniorUsers, priorityUsers }: UsersDashboardProps) {
+/**
+ * 加载状态组件
+ */
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+        <p className="text-muted-foreground">加载中...</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 用户管理主内容组件
+ */
+function UsersManagementContent({ funds, fund, juniorUsers, priorityUsers }: UsersDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -177,5 +194,16 @@ export function UsersDashboard({ funds, fund, juniorUsers, priorityUsers }: User
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * 主导出组件 - 使用 Suspense 包裹
+ */
+export function UsersDashboard(props: UsersDashboardProps) {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <UsersManagementContent {...props} />
+    </Suspense>
   );
 }
