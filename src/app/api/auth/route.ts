@@ -1,34 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
+import { generateToken, verifyToken } from '@/lib/auth';
 
 const prisma = new PrismaClient();
-
-/**
- * 简单的 token 生成（生产环境应使用专业库）
- */
-function generateToken(userId: string): string {
-  const payload = {
-    userId,
-    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7天过期
-  };
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
-}
-
-/**
- * 验证 token
- */
-export function verifyToken(token: string): { userId: string } | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token, 'base64').toString());
-    if (payload.exp < Date.now()) {
-      return null;
-    }
-    return { userId: payload.userId };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * POST Handler: 用户登录
