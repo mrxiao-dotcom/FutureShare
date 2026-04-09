@@ -132,14 +132,24 @@ export async function POST(request: NextRequest) {
 
     // 更新基金当前资金
     if (userType === 'JUNIOR') {
+      // 计算新的劣后总额
+      const newJuniorCapital = fund.currentJuniorCapital + capitalAmount;
+      // 自动配齐优先资金：优先 = 劣后 × 9
+      const targetPriorityCapital = newJuniorCapital * 9;
+      const priorityGap = targetPriorityCapital - fund.currentPriorityCapital;
+
       await prisma.fund.update({
         where: { id: fundId },
         data: {
           currentJuniorCapital: {
             increment: capitalAmount,
           },
+          // 自动补足优先资金差额
+          currentPriorityCapital: priorityGap > 0 ? {
+            increment: priorityGap,
+          } : undefined,
           totalAssets: {
-            increment: capitalAmount,
+            increment: capitalAmount + (priorityGap > 0 ? priorityGap : 0),
           },
         },
       });

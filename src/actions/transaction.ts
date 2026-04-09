@@ -166,11 +166,31 @@ export async function adminRecordTransaction(
     // 根据类型调整基金的劣后本金
     const capitalChange = type === 'DEPOSIT' ? amount : -amount;
 
+    // 计算新的劣后总额
+    const newJuniorCapital = fund.currentJuniorCapital + capitalChange;
+    // 自动配齐优先资金：优先 = 劣后 × 9
+    const targetPriorityCapital = newJuniorCapital * 9;
+
+    // 查询当前优先资金
+    const fundWithPriority = await prisma.fund.findUnique({
+      where: { id: fundId },
+      select: { currentPriorityCapital: true },
+    });
+    const currentPriorityCapital = fundWithPriority?.currentPriorityCapital || 0;
+    const priorityGap = targetPriorityCapital - currentPriorityCapital;
+
     await prisma.fund.update({
       where: { id: fundId },
       data: {
         currentJuniorCapital: {
           increment: capitalChange,
+        },
+        // 自动补足优先资金差额（入金时补足，出金时不减少优先）
+        ...(priorityGap > 0 && type === 'DEPOSIT' ? {
+          currentPriorityCapital: { increment: priorityGap },
+        } : {}),
+        totalAssets: {
+          increment: capitalChange + (priorityGap > 0 && type === 'DEPOSIT' ? priorityGap : 0),
         },
       },
     });
