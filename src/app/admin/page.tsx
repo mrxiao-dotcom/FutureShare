@@ -50,7 +50,7 @@ async function getJuniorUsers(fundId: string) {
     id: user.id,
     name: user.name,
     email: user.email,
-    shareRatio: user.participations[0]?.shareRatio || user.shareRatio,
+    capitalAmount: user.participations[0]?.capitalAmount || 0,
     status: user.status,
     totalProfit: user.totalProfit,
     totalLoss: user.totalLoss,

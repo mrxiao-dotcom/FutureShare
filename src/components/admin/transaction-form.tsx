@@ -29,9 +29,11 @@ interface TransactionFormProps {
   juniorUsers: Array<{
     id: string;
     name: string;
-    shareRatio: number;
+    capitalAmount: number;
     status: string;
   }>;
+  /** 劣后总出资（用于计算占比） */
+  totalJuniorCapital: number;
   /** 刷新回调 */
   onSuccess?: () => void;
 }
@@ -44,9 +46,15 @@ const TRANSACTION_TYPES = [
   { value: 'WITHDRAWAL', label: '出金（提取资金）', color: 'text-red-600' },
 ] as const;
 
-export function TransactionForm({ fundId, juniorUsers, onSuccess }: TransactionFormProps) {
+export function TransactionForm({ fundId, juniorUsers, totalJuniorCapital, onSuccess }: TransactionFormProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  // 计算用户占比
+  const calculateRatio = (capitalAmount: number) => {
+    if (totalJuniorCapital <= 0) return 0;
+    return capitalAmount / totalJuniorCapital;
+  };
 
   // 表单状态
   const [userId, setUserId] = React.useState('');
@@ -164,7 +172,7 @@ export function TransactionForm({ fundId, juniorUsers, onSuccess }: TransactionF
                 ) : (
                   juniorUsers.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({formatPercent(user.shareRatio)})
+                      {user.name} ({formatPercent(calculateRatio(user.capitalAmount))})
                     </SelectItem>
                   ))
                 )}

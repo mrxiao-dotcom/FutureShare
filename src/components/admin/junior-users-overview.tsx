@@ -26,7 +26,7 @@ interface JuniorUsersOverviewProps {
     id: string;
     name: string;
     email: string | null;
-    shareRatio: number;
+    capitalAmount: number;
     status: string;
     totalProfit: number;
     totalLoss: number;
@@ -35,6 +35,8 @@ interface JuniorUsersOverviewProps {
   }>;
   /** 当前劣后池总权益（用于计算用户权益） */
   juniorPoolAssets: number;
+  /** 劣后总出资（用于计算份额比例） */
+  totalJuniorCapital: number;
   /** 刷新回调 */
   onRefresh?: () => void;
 }
@@ -48,8 +50,16 @@ const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'secon
   WITHDRAWN: { label: '已退出', variant: 'destructive' },
 };
 
-export function JuniorUsersOverview({ users, juniorPoolAssets, onRefresh }: JuniorUsersOverviewProps) {
+export function JuniorUsersOverview({ users, juniorPoolAssets, totalJuniorCapital, onRefresh }: JuniorUsersOverviewProps) {
   const router = useRouter();
+
+  /**
+   * 计算用户出资占比
+   */
+  const calculateRatio = (userCapital: number) => {
+    if (totalJuniorCapital <= 0) return 0;
+    return userCapital / totalJuniorCapital;
+  };
 
   /**
    * 刷新数据
@@ -63,10 +73,11 @@ export function JuniorUsersOverview({ users, juniorPoolAssets, onRefresh }: Juni
    * 计算用户当前权益
    */
   const calculateUserEquity = (user: typeof users[0]) => {
-    if (juniorPoolAssets === 0 || user.shareRatio === 0) {
-      return user.currentCapital;
+    const ratio = calculateRatio(user.capitalAmount);
+    if (juniorPoolAssets === 0 || ratio === 0) {
+      return user.capitalAmount;
     }
-    return juniorPoolAssets * user.shareRatio;
+    return juniorPoolAssets * ratio;
   };
 
   /**
@@ -74,7 +85,7 @@ export function JuniorUsersOverview({ users, juniorPoolAssets, onRefresh }: Juni
    */
   const calculateUserProfit = (user: typeof users[0]) => {
     const equity = calculateUserEquity(user);
-    return equity - user.currentCapital;
+    return equity - user.capitalAmount;
   };
 
   return (
@@ -125,6 +136,7 @@ export function JuniorUsersOverview({ users, juniorPoolAssets, onRefresh }: Juni
               {users.map((user) => {
                 const equity = calculateUserEquity(user);
                 const profit = calculateUserProfit(user);
+                const ratio = calculateRatio(user.capitalAmount);
                 const isProfit = profit >= 0;
                 const badge = STATUS_BADGES[user.status] || { label: user.status, variant: 'outline' as const };
 
@@ -145,7 +157,7 @@ export function JuniorUsersOverview({ users, juniorPoolAssets, onRefresh }: Juni
                     {/* 份额比例 */}
                     <TableCell>
                       <span className="font-medium text-primary">
-                        {formatPercent(user.shareRatio)}
+                        {formatPercent(ratio)}
                       </span>
                     </TableCell>
 

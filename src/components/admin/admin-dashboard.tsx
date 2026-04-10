@@ -221,12 +221,14 @@ export function AdminDashboard({ funds, fund, juniorUsers }: AdminDashboardProps
             <TransactionForm
               fundId={activeFundId}
               juniorUsers={juniorUsers}
+              totalJuniorCapital={fund?.currentJuniorCapital || 0}
             />
 
             {/* 劣后用户份额明细 */}
             <JuniorUsersOverview
               users={juniorUsers}
-              juniorPoolAssets={fund?.currentJuniorCapital || 0}
+              juniorPoolAssets={(fund?.totalAssets || 0) - (fund?.currentPriorityCapital || 0)}
+              totalJuniorCapital={fund?.currentJuniorCapital || 0}
             />
           </div>
         </main>
