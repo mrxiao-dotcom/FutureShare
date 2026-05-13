@@ -63,24 +63,32 @@ export async function POST(request: NextRequest) {
     // 计算总出资（优先 + 劣后）
     const totalContributions = fund.currentPriorityCapital + fund.currentJuniorCapital;
     
-    // 计算可分配利润
+    // 计算可分配利润（可能为负）
     const distributableProfit = assets - totalContributions;
-    
-    // 按配置比例计算各方理论权益
-    const traderShare = distributableProfit > 0 
-      ? distributableProfit * fund.traderShareRatio 
-      : 0;
-    const priorityShare = distributableProfit > 0 
-      ? distributableProfit * fund.priorityShareRatio 
-      : 0;
-    const juniorShare = distributableProfit > 0 
-      ? distributableProfit * fund.juniorShareRatio 
-      : 0;
 
-    // 计算各方实际权益
-    const priorityAssets = fund.currentPriorityCapital + priorityShare;
-    const juniorAssets = fund.currentJuniorCapital + juniorShare;
-    const traderAssets = traderShare;
+    // 计算各方权益
+    let priorityAssets, juniorAssets, traderAssets;
+    let priorityShare, juniorShare, traderShare;
+
+    if (distributableProfit >= 0) {
+      // 【盈利时】按配置比例分配利润
+      priorityShare = distributableProfit * fund.priorityShareRatio;
+      juniorShare = distributableProfit * fund.juniorShareRatio;
+      traderShare = distributableProfit * fund.traderShareRatio;
+
+      priorityAssets = fund.currentPriorityCapital + priorityShare;
+      juniorAssets = fund.currentJuniorCapital + juniorShare;
+      traderAssets = traderShare;
+    } else {
+      // 【亏损时】劣后承担所有亏损，优先保本
+      priorityShare = 0;
+      traderShare = 0;
+      juniorShare = distributableProfit; // 负数，表示亏损承担额
+
+      priorityAssets = fund.currentPriorityCapital; // 优先保本
+      juniorAssets = fund.currentJuniorCapital + distributableProfit; // 劣后本金 + 亏损（负数）
+      traderAssets = 0; // 操盘手亏损为0
+    }
 
     // 快照日期
     const snapshotTime = snapshotDate ? new Date(snapshotDate) : new Date();
